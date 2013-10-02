@@ -201,9 +201,19 @@ Pair.prototype.toString = function Pair$prototype$toString() {
     return "[Pair " + this.toTupleString() + "]";
 }
 Pair.prototype.fst = function Pair$prototype$fst() {
+	// allow use as a setter
+	if (arguments.length == 1) {
+		this.components[0] = arguments[0];
+	}
+	
     return this.components[0];
 }
 Pair.prototype.snd = function Pair$prototype$snd() {
+	// allow use as a setter
+	if (arguments.length == 1) {
+		this.components[1] = arguments[0];
+	}
+	
     return this.components[1];
 }
 
@@ -1249,6 +1259,6 @@ exports.Repeat = Repeat;
 exports.Done = Done;
 exports.ConstA = ConstA;
 exports.DelayA = DelayA;
-exports.ListenA = ListenA;
-exports.Listen2 = Listen2;
+//exports.ListenA = ListenA;
+exports.ListenA = Listen2;
 exports.ListenWithValueA = ListenWithValueA;
