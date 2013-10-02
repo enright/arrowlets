@@ -1,4 +1,5 @@
 var Arr = require('./nodeArrowlets');
+var DelayGameTicksA = require('./delayGameTicksA').DelayGameTicksA;
 var events = require("events");
 
 // an event emitter for a game
@@ -16,37 +17,6 @@ var gameEmitter = (function () {
 var board = [ [1, 2, 3], [4, 5, 6], [7, 5, 8] ];
 // each array entry is row, col, new value
 var boardChanges = [ { r: 0, c: 1, value: 9 }, { r: 2, c: 2, value: 10 } ];
-
-// create our own arrow for delaying a certain number of game ticks
-function DelayGameTicksA(ticks) {
-    if (!(this instanceof DelayGameTicksA))
-        return new DelayGameTicksA(ticks);
-    this.delayTicks = ticks;
-}
-DelayGameTicksA.prototype = new Arr.AsyncA(function (pair, a) {
-
-    var delayTicks = this.delayTicks,
-    	emitter = pair.fst(),
-    	beginTick = emitter.gameTick;
-	
-	// cancel just removes the listener from the emitter
-    var cancel = function () {
-        emitter.removeListener('tick', listener);
-    }
-    
-    var listener = function (event) {
-    	// check the property on the event and see if it is the value we're looking for
-    	if (beginTick + delayTicks < event.tick) {
-    		emitter.eventData = event;
-			cancel();
-			a.advance(cancel);
-			a.cont(pair);
-        }
-    }
-      
-    a.addCanceller(cancel);
-    emitter.addListener('tick', listener);
-});
 	
 // create a function 'playerCanTakeChest' that changes the game setting
 // from the value in the arrow (which is passed in - and the arrow value is initially false)
