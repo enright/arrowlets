@@ -1,25 +1,21 @@
 var Arr = require('./nodeArrowlets');
 var events = require("events");
 
-// an event emitter
-var emitter = new events.EventEmitter();
+// an event emitter for a game
+// serves as game clock
+var gameEmitter = (function () {
+	var emitter = new events.EventEmitter();
+	// dependent on this value in the emitter for DelayGameTicksA
+	emitter.gameTick = 0;
+	// set to the event when an event is fired
+	emitter.eventData = undefined;
+	return emitter;
+}());
 
 // 3x3 board of values
 var board = [ [1, 2, 3], [4, 5, 6], [7, 5, 8] ];
 // each array entry is row, col, new value
 var boardChanges = [ { r: 0, c: 1, value: 9 }, { r: 2, c: 2, value: 10 } ];
-
-// need the board coming from somewhere
-// var boardA = Arr.ConstA(board);
-// function doom(boardChanges) {
-// 	// change the board
-// 	
-// 	return originalBoardValues;
-// }
-// 
-// function waitGameSeconds(secs) {
-// 	return Arr.ListenWithValueA('tick', 'tick', secs);
-// }
 
 // create our own arrow for delaying a certain number of game ticks
 function DelayGameTicksA(ticks) {
@@ -47,13 +43,10 @@ DelayGameTicksA.prototype = new Arr.AsyncA(function (pair, a) {
 			a.cont(pair);
         }
     }
-    
-    
+      
     a.addCanceller(cancel);
-    beginTick = emitter.gameTick;
     emitter.addListener('tick', listener);
 });
-
 	
 // create a function 'playerCanTakeChest' that changes the game setting
 // from the value in the arrow (which is passed in - and the arrow value is initially false)
@@ -91,13 +84,13 @@ var playerTookChest = (function (pair) {
 // we flip the setting after 4 seconds and log a little message
 // then this arrow is done
 var chestAndKey =
-	Arr.ConstA(new Arr.Pair(emitter, gameSettings.canTakeChest))
+	Arr.ConstA(new Arr.Pair(gameEmitter, gameSettings.canTakeChest))
 		.then(Arr.ListenWithValueA('takePrize', 'prizeName', 'key'))
 		.then(playerCanTakeChest.second())
 		.then((function (x) { console.log('can take chest ', x); return x; }).second())
 		.then((Arr.DelayA(6000)
-			.then(playerCanTakeChest.second())
-			.then((function (x) { console.log('can take chest ', x); return x; }).second()))
+				.then(playerCanTakeChest.second())
+				.then((function (x) { console.log('can take chest ', x); return x; }).second()))
 			.or(Arr.ListenWithValueA('takePrize', 'prizeName', 'chest')
 				.then(playerTookChest)));
 
@@ -124,44 +117,16 @@ var boardTileChange = (function (board) {
 		return applyChanges(board, changes);
 	};
 }(board));
-
-
-// we'll kick off the arrow with the emitter and changes to the board
-// in this case, we have made the data part of the arrow
-// var boardTileChanges =
-// 	Arr.ConstA(new Arr.Pair(emitter, boardChanges))
-// 		.then(Arr.ListenA('tick'))
-// 		.then(boardTileChange.second())
-// 		.then(Arr.ListenA('two'))
-// 		.then(boardTileChange.second())
-// 		.then(repeatTuple)
-// 		.repeat();
 		
 var boardTileChanges =
-	Arr.ConstA(new Arr.Pair(emitter, boardChanges))
+	Arr.ConstA(new Arr.Pair(gameEmitter, boardChanges))
 		.then(DelayGameTicksA(1))
 		.then(boardTileChange.second())
 		.then(DelayGameTicksA(3))
 		.then(boardTileChange.second())
 		.then(repeatTuple)
 		.repeat();
-
-
-
-// we'll kick off the arrow with the emitter and changes to the board
-// in this case the data fed to the arrow is passed into run
-// var progress =
-// 	ListenA('tick')
-// 		.then(boardTileChange.second())
-// 		.then(ListenA('two'))
-// 		.then(boardTileChange.second())
-// 		.then(repeatTuple)
-// 		.repeat()
-// 		.run(new Pair(emitter, boardChanges));
 		
-// dependent on this value in the emitter for DelayGameTicksA
-emitter.gameTick = 0;
-
 progress = boardTileChanges
 	.fanout(chestAndKey)
 	.run();
@@ -204,5 +169,5 @@ var game = (function (emitter, progress) {
 		clearInterval(gotChest);
 		progress.cancel();
 	}, 10000);
-}(emitter, progress));
+}(gameEmitter, progress));
 
