@@ -1258,6 +1258,7 @@ exports.Pair = Pair;
 exports.Repeat = Repeat;
 exports.Done = Done;
 exports.ConstA = ConstA;
+exports.AsyncA = AsyncA
 exports.DelayA = DelayA;
 //exports.ListenA = ListenA;
 exports.ListenA = Listen2;
