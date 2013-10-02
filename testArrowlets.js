@@ -21,6 +21,39 @@ var boardChanges = [ { r: 0, c: 1, value: 9 }, { r: 2, c: 2, value: 10 } ];
 // 	return Arr.ListenWithValueA('tick', 'tick', secs);
 // }
 
+// create our own arrow for delaying a certain number of game ticks
+function DelayGameTicksA(ticks) {
+    if (!(this instanceof DelayGameTicksA))
+        return new DelayGameTicksA(ticks);
+    this.delayTicks = ticks;
+}
+DelayGameTicksA.prototype = new Arr.AsyncA(function (pair, a) {
+
+    var delayTicks = this.delayTicks,
+    	emitter = pair.fst(),
+    	beginTick = emitter.gameTick;
+	
+	// cancel just removes the listener from the emitter
+    var cancel = function () {
+        emitter.removeListener('tick', listener);
+    }
+    
+    var listener = function (event) {
+    	// check the property on the event and see if it is the value we're looking for
+    	if (beginTick + delayTicks < event.tick) {
+    		emitter.eventData = event;
+			cancel();
+			a.advance(cancel);
+			a.cont(pair);
+        }
+    }
+    
+    
+    a.addCanceller(cancel);
+    beginTick = emitter.gameTick;
+    emitter.addListener('tick', listener);
+});
+
 	
 // create a function 'playerCanTakeChest' that changes the game setting
 // from the value in the arrow (which is passed in - and the arrow value is initially false)
@@ -95,18 +128,25 @@ var boardTileChange = (function (board) {
 
 // we'll kick off the arrow with the emitter and changes to the board
 // in this case, we have made the data part of the arrow
+// var boardTileChanges =
+// 	Arr.ConstA(new Arr.Pair(emitter, boardChanges))
+// 		.then(Arr.ListenA('tick'))
+// 		.then(boardTileChange.second())
+// 		.then(Arr.ListenA('two'))
+// 		.then(boardTileChange.second())
+// 		.then(repeatTuple)
+// 		.repeat();
+		
 var boardTileChanges =
 	Arr.ConstA(new Arr.Pair(emitter, boardChanges))
-		.then(Arr.ListenA('tick'))
+		.then(DelayGameTicksA(1))
 		.then(boardTileChange.second())
-		.then(Arr.ListenA('two'))
+		.then(DelayGameTicksA(3))
 		.then(boardTileChange.second())
 		.then(repeatTuple)
 		.repeat();
 
-progress = boardTileChanges
-	.fanout(chestAndKey)
-	.run();
+
 
 // we'll kick off the arrow with the emitter and changes to the board
 // in this case the data fed to the arrow is passed into run
@@ -119,18 +159,25 @@ progress = boardTileChanges
 // 		.repeat()
 // 		.run(new Pair(emitter, boardChanges));
 		
+// dependent on this value in the emitter for DelayGameTicksA
+emitter.gameTick = 0;
 
-
+progress = boardTileChanges
+	.fanout(chestAndKey)
+	.run();
+	
 // a game using a nodejs event emitter
 // emits events at specific intervals
 var game = (function (emitter, progress) {
 	var anEmitter = emitter;
+	emitter.gameTick = 0;
 	var tick = 0;
 	
 	// every second, emit this event
 	var oneCanceller = setInterval(function () {
 		tick += 1;
 		console.log('tick ', tick);
+		emitter.gameTick = tick;
 		anEmitter.emit('tick', { tick: tick });
 	}, 1000);	
 	
