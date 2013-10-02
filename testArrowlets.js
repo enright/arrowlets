@@ -77,20 +77,22 @@ var playerTookChest = (function (pair) {
 	return pair;
 }).Arr();
 
-// we start off this arrow with the current canTakeChest value from the game settings
-// we listen (perhaps forever) for the player to take the key
-// we flip the setting if they do - we log a little message
-// then the user has 4 seconds to get the chest
-// we flip the setting after 4 seconds and log a little message
-// then this arrow is done
+
+// create an arrow to handle chest and key behavior
 var chestAndKey =
 	Arr.ConstA(new Arr.Pair(gameEmitter, gameSettings.canTakeChest))
+		// listen for the event of the user taking the key
 		.then(Arr.ListenWithValueA('takePrize', 'prizeName', 'key'))
+		// then flip the take chest flag
 		.then(playerCanTakeChest.second())
+		// this is just a log message
 		.then((function (x) { console.log('can take chest ', x); return x; }).second())
+		// then run either time running out or user taking the chest
 		.then((Arr.DelayA(6000)
+				// flip the take ches flag in 6 seconds
 				.then(playerCanTakeChest.second())
 				.then((function (x) { console.log('can take chest ', x); return x; }).second()))
+			// or the user got the chest and process that
 			.or(Arr.ListenWithValueA('takePrize', 'prizeName', 'chest')
 				.then(playerTookChest)));
 
@@ -118,15 +120,22 @@ var boardTileChange = (function (board) {
 	};
 }(board));
 		
+// create a board tile changing arrow
 var boardTileChanges =
 	Arr.ConstA(new Arr.Pair(gameEmitter, boardChanges))
+		// wait a second after start
 		.then(DelayGameTicksA(1))
+		// then change the tiles
 		.then(boardTileChange.second())
+		// waith three seconds
 		.then(DelayGameTicksA(3))
+		// and change them back
 		.then(boardTileChange.second())
+		// repeat this forever
 		.then(repeatTuple)
 		.repeat();
-		
+	
+// fanout (run in parallel) the two arrows we created	
 progress = boardTileChanges
 	.fanout(chestAndKey)
 	.run();
