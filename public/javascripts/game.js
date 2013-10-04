@@ -106,43 +106,20 @@ $(function () {
 	
 	socket.on('text-message', function (data) {
 		$('#message').text(data);
-	});
-	
-	socket.on('move-player-to', function (data) {
-		// which player/piece
-		
-		// remove from old
-		// move to new
-	});
-	
+	});	
 	
 	function setTiles(tiles) {
 		var i,
-			tilesLength = tiles.length,
-			tileImage,
-			regClasses;
+			tilesLength = tiles.length;
 			
 		for (i = 0; i < tilesLength; i += 1) {
 			// get the list item for this rank and file
-			li = $('li.b-rank-' + tiles[i].rank + '.b-file-' + tiles[i].file);
-			// we want to re-use the classes on the first img in the li
-			regClasses = li.children('img').first().attr('class');
-			tileImage = $(document.createElement("img"))
-						.attr({ src: tiles[i].src, 
-							'data-layer': 'tile', 
-							'data-rank': tiles[i].rank,
-							'data-file': tiles[i].file,
-							style: 'z-index: 1',
-							class:  regClasses
-						});		
-			li.children('img').first().remove();		
-			li.prepend(tileImage);
+			li = $('li.b-rank-' + tiles[i].rank + '.b-file-' + tiles[i].file)
+				.children('img').first().attr('src', tiles[i].src);
 		}
 	}
 	
-	socket.on('set-tiles', function (data) {
-		setTiles(data);
-	});
+	socket.on('set-tiles', setTiles);
 
 	function classesArrayToString(classArray) {
 		var i,
@@ -157,6 +134,7 @@ $(function () {
 	function setPieces(pieces) {
 		var i,
 			piecesLength = pieces.length,
+			li,
 			pieceImage,
 			regClasses;
 			
@@ -166,22 +144,34 @@ $(function () {
 			// we want to re-use the classes on the first img in the li
 			regClasses = li.children('img').first().attr('class').match(/b-[^ ]+/g);
 			pieceImage = $(document.createElement("img"))
-						.attr({ name: pieces[i].name, src: pieces[i].src, 'data-layer': 'piece', style: 'pointer-events:none; z-index: 3' })
-						.addClass(classesArrayToString(regClasses));				
+							.attr({ 'data-name': pieces[i].name, 
+								src: pieces[i].src, 
+								'data-layer': 'piece', 
+								style: 'pointer-events:none; z-index: 3' 
+							})
+							.addClass(classesArrayToString(regClasses));				
 			li.append(pieceImage);
 		}
 	};
 		
-	socket.on('set-pieces', function (data) {
-		setPieces(data);
-	});
-	
-	socket.on('remove-pieces', function (data) {
-	});
+	socket.on('set-pieces', setPieces);
+
+	function removePieces(pieces) {
+		var i,
+			piecesLength = pieces.length;
+			
+		for (i = 0; i < piecesLength; i += 1) {
+			$('li.b-rank-' + pieces[i].rank + '.b-file-' + pieces[i].file)
+				.find('img[data-name=\"'+pieces[i].name + '\"]').remove();
+		}
+	}	
+		
+	socket.on('remove-pieces', removePieces);
 	
 	function setPrizes(prizes) {
 		var i,
 			prizesLength = prizes.length,
+			li,
 			prizeImage,
 			regClasses;
 			
@@ -191,18 +181,28 @@ $(function () {
 			// we want to re-use the classes on the first img in the li
 			regClasses = li.children('img').first().attr('class').match(/b-[^ ]+/g);
 			prizeImage = $(document.createElement("img"))
-						.attr({ src: prizes[i].src, 'data-layer': 'prize', style: 'pointer-events:none; z-index: 2' })
-						.addClass(classesArrayToString(regClasses));				
+							.attr({ src: prizes[i].src, 
+								'data-layer': 'prize', 
+								style: 'pointer-events:none; z-index: 2' 
+							})
+							.addClass(classesArrayToString(regClasses));				
 			li.append(prizeImage);
 		}
 	};
 	
-	socket.on('set-prizes', function (data) {
-		setPrizes(data);
-	});
+	socket.on('set-prizes', setPrizes);
 	
-	socket.on('remove-prizes', function (data) {
-	});
+	function removePrizes(prizes) {
+		var i,
+			prizesLength = prizes.length;
+			
+		for (i = 0; i < prizesLength; i += 1) {
+			$('li.b-rank-' + prizes[i].rank + '.b-file-' + prizes[i].file)
+				.find('img[src=\"'+prizes[i].src + '\"]').remove();
+		}
+	}
+	
+	socket.on('remove-prizes', removePrizes);
 	
 	socket.on('board', function (data) {
 
@@ -240,6 +240,14 @@ $(function () {
 		if (data.pieces) {
 			setPieces(data.pieces);
 		}
+		
+// 		var testPrize = [{ rank: 8, file: 2, src: 'prizeImages/key.png'}];
+// 		setPrizes(testPrize);
+// 		removePrizes(testPrize);
+// 		
+// 		var testPiece = [{ rank: 8, file: 2, src: 'pieceImages/monster.png', name: 'bill'}];
+// 		setPieces(testPiece);
+// 		removePieces(testPiece);
 		
 		$('#startGame').click(function () {
 			socket.emit('start-game');
