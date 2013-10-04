@@ -25,14 +25,18 @@ THE SOFTWARE.
 /**
  * Module dependencies.
  */
-
+var events = require('events');
 var express = require('express');
 var routes = require('./routes');
 var user = require('./routes/user');
 var http = require('http');
 var path = require('path');
-
 var app = express();
+
+	// we want sockets for browser/server communication
+	// and we want imghex for generation of hex tiles in browser ui
+	var socketio = require('socket.io');
+	var imghex = require('imghex');
 
 // all environments
 app.set('port', process.env.PORT || 3000);
@@ -40,8 +44,15 @@ app.set('views', __dirname + '/views');
 app.set('view engine', 'jade');
 app.use(express.favicon());
 app.use(express.logger('dev'));
+
+	// serve up board tiles from the url /boardTiles...redirect it to /views/boardTiles
+	app.use('/tileImages', express.static(__dirname + '/public/images/tileImages'));
+	app.use('/pieceImages', express.static(__dirname + '/public/images/pieceImages'));
+	app.use('/prizeImages', express.static(__dirname + '/public/images/prizeImages'));
+	app.use('/sounds', express.static(__dirname + '/public/sounds'));
+	
 app.use(express.bodyParser());
-app.use(express.methodOverride());
+// not needed app.use(express.methodOverride());
 app.use(express.cookieParser('your secret here'));
 app.use(express.session());
 app.use(app.router);
@@ -53,8 +64,106 @@ if ('development' == app.get('env')) {
 }
 
 app.get('/', routes.index);
-app.get('/users', user.list);
-
-http.createServer(app).listen(app.get('port'), function(){
-  console.log('Express server listening on port ' + app.get('port'));
+app.get('/test', function(req, res) {
+	res.send('ouch');
 });
+
+function createGameIo(io, id, game) {
+	var gameIo = {};
+	
+	// get rid of the old one if we've got the same id
+	if (io.namespaces[id] !== undefined) {
+		delete io.namespaces[id];
+	}
+	
+	// creat a namespace for the game
+	gameIo.namespace = io.of(id);
+	
+	// set up incoming message handlers on socket on connect
+	gameIo.namespace.on('connection', function (socket) {
+		socket.emit('text-message', 'Welcome to Quest 4 Sushi!');
+		game.connected(socket);
+		socket.on('start-game', game.startGame);
+		socket.on('move-to', game.moveTo);
+	});
+		
+	return gameIo;
+}
+
+function createGame(id) {
+	var game = {},
+		emitter = new events.EventEmitter();
+	
+	// create io
+	game.gameIo = createGameIo(io, id, game);
+	
+	// get data to the client to configure the game
+	game.connected = function(socket) {
+		// need an ack for receipt of board
+		socket.emit('board', { ranks: 20, files: 15, defaultImageURL: 'tileImages/grassField.png' });
+		// randomly place player
+		
+		// place prizes
+	};
+
+	// handle incoming messages from client	
+	game.startGame = function(data) {
+		// start the game!
+		console.log('user requested start game');
+		game.server_sendMessage('The game has started!');
+	};
+	
+	game.moveTo = function(data) {
+		// can the user move here?
+		console.log('user request move-to ', data);
+	};
+	
+	game.server_movePlayer = function (to) {
+		game.gameIo.namespace.emit('move-player-to', to);
+	};
+	
+	game.server_setPoints = function (points) {
+		game.gameIo.namespace.emit('set-points', points);
+	};
+	
+	game.server_setCountdown = function (countdown) {
+		game.gameIo.namespace.emit('set-countdown', countdown);
+	};
+	
+	game.server_sendMessage = function (message) {
+		game.gameIo.namespace.emit('text-message', message);
+	};
+	
+	return game;
+}
+
+app.get('/game1', function(req, res) {
+	var socketId,
+		socketListener,
+		gameController;
+	try {
+		// this will be the game id
+		socketId = '/game1_' + req.sessionID;
+		
+		createGame(socketId);
+		
+		//send the page across to the client
+		res.render('game1', {
+			title: "Game 1",
+			game: socketId,
+			hexTemplateCode: imghex.hexMapDivTemplate(),
+			layout: false
+		});
+		
+	} catch (e) {
+		console.log(e);
+	}
+});
+
+	var server = http.createServer(app);
+	server.listen(app.get('port'), function(){
+	  console.log('Express server listening on port ' + app.get('port'));
+	});
+
+	var io = socketio.listen(server);
+	io.set('log level', 1);

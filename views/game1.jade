@@ -1,0 +1,43 @@
+!!!
+html
+  head
+    title= title
+    script(src='http://ajax.googleapis.com/ajax/libs/jquery/1.7.2/jquery.min.js')
+    script(src='http://ajax.googleapis.com/ajax/libs/jqueryui/1.10.3/jquery-ui.js')
+    link(rel='stylesheet', href='http://ajax.googleapis.com/ajax/libs/jqueryui/1.10.3/themes/eggplant/jquery-ui.min.css')   
+
+    script(src='javascripts/jade-runtime.js')
+
+    style(type='text/css') img.moverange { opacity:0.6; }
+
+  body    
+    div#gameSettings(gameId=game, style='display: none') 
+    div(class='ui-corner-all ui-widget ui-widget-content')
+      div(style='display:inline-block; height:40px')
+        p=title
+      button(style='margin-left: 30px')#startGame Start Game
+    div(class='ui-widget ui-widget-content', style='font-size:14px')
+      label#gameCountdownLabel(style='width: 200px')= "Time remaining: "
+      label#gameCountdown(style='display:inline-block; min-width: 50px; max-width: 50px')
+      label#pointsLabel(style='width: 150px')= "Points: "
+      label#points(style='display:inline-block; min-width: 100px; max-width: 100px')
+      label#message
+    div#ourCoolMap(class='ui-widget ui-widget-content', style='font-size:14px')
+
+    div#images(style='display: none')
+      div#tileImages
+        img(id='tileImages/grassField.png', src='tileImages/grassField.png')
+        img(id='tileImages/stonePath.png', src='tileImages/stonePath.png')
+        img(id='tileImages/stoneyField.png', src='tileImages/stoneyField.png')
+        img(id='tileImages/water.png', src='tileImages/water.png')
+      div#pieceImages
+        img(id='pieceImages/sumo-wrestler.png', src='pieceImages/sumo-wrestler.png')
+      div#prizeImages
+        img(id='prizeImages/GemBlue.png', src='prizeImages/GemBlue.png')
+        img(id='prizeImages/GemGreen.png', src='prizeImages/GemGreen.png')
+        img(id='prizeImages/GemOrange.png', src='prizeImages/GemOrange.png')
+
+    script(src="/socket.io/socket.io.js")
+    script var myhextemplate = !{hexTemplateCode}
+    script(src='/javascripts/game.js')
+    script(src='/sounds/soundsAsDataURI.js')
