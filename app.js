@@ -99,11 +99,21 @@ function createGame(id) {
 	
 	// get data to the client to configure the game
 	game.connected = function(socket) {
-		// need an ack for receipt of board
-		socket.emit('board', { ranks: 20, files: 15, defaultImageURL: 'tileImages/grassField.png' });
-		// randomly place player
-		
-		// place prizes
+		var prizes = [{ rank: 2, file:3, src: "prizeImages/key.png" },
+						{ rank: 6, file: 5, src: "prizeImages/Chest-Closed.png" }],
+			pieces = [{ rank: 0, file: 0, src: "pieceImages/sumo-wrestler.png" }],
+			tiles = [{ rank: 3, file: 10, src: "tileImages/water.png" }, 
+				{ rank: 4, file: 10, src: "tileImages/water.png" },
+				{ rank: 3, file: 11, src: "tileImages/water.png" }];
+
+		socket.emit('board', { ranks: 20, 
+			files: 15, 
+			defaultImageURL: 'tileImages/grassField.png', 
+			prizes: prizes, 
+			pieces: pieces,
+			tiles: tiles
+		});
+
 	};
 
 	// handle incoming messages from client	
@@ -116,10 +126,24 @@ function createGame(id) {
 	game.moveTo = function(data) {
 		// can the user move here?
 		console.log('user request move-to ', data);
+		// did they land on a prize? increase points, remove prize, update points
+		
 	};
 	
 	game.server_movePlayer = function (to) {
-		game.gameIo.namespace.emit('move-player-to', to);
+		game.gameIo.namespace.emit('set-pieces', [{ name: 'player', 
+			src: 'pieceImages/sumo-wrestler.png', 
+			rank: to. r, 
+			file: to.f 
+		}]);
+	};
+	
+	game.server_moveMonster = function (to) {
+		game.gameIo.namespace.emit('set-pieces', [{ name: 'monster', 
+			src: 'pieceImages/monster.png', 
+			rank: to. r, 
+			file: to.f 
+		}]);
 	};
 	
 	game.server_setPoints = function (points) {
