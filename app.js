@@ -121,6 +121,7 @@ function createGame(id) {
 		// start the game!
 		console.log('user requested start game');
 		game.server_sendMessage('The game has started!');
+		game.server_playSound({ name: 'win.m4a', gain: 0.5 });
 	};
 	
 	game.moveTo = function(data) {
@@ -158,6 +159,9 @@ function createGame(id) {
 		game.gameIo.namespace.emit('text-message', message);
 	};
 	
+	game.server_playSound = function (sound) {
+		game.gameIo.namespace.emit('one-shot-sound', sound);
+	};
 	return game;
 }
 
@@ -184,10 +188,10 @@ app.get('/game1', function(req, res) {
 	}
 });
 
-	var server = http.createServer(app);
-	server.listen(app.get('port'), function(){
-	  console.log('Express server listening on port ' + app.get('port'));
-	});
+var server = http.createServer(app);
+server.listen(app.get('port'), function(){
+  console.log('Express server listening on port ' + app.get('port'));
+});
 
-	var io = socketio.listen(server);
-	io.set('log level', 1);
+var io = socketio.listen(server);
+io.set('log level', 1);
