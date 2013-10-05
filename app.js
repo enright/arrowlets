@@ -33,6 +33,9 @@ var http = require('http');
 var path = require('path');
 var app = express();
 
+// Yay! Arrows!
+var ARR = require('./nodeArrowlets');
+
 	// we want sockets for browser/server communication
 	// and we want imghex for generation of hex tiles in browser ui
 	var socketio = require('socket.io');
@@ -90,9 +93,73 @@ function createGameIo(io, id, game) {
 	return gameIo;
 }
 
+var gameClockCancellers = {};
+
+// tuple-aware repeat, used for unending loops
+var repeatTuple = (function (tuple) { return Arr.Repeat(tuple); }).Arr();
+
 function createGame(id) {
 	var game = {},
-		emitter = new events.EventEmitter();
+		emitter = new events.EventEmitter(),
+		tickCanceller,
+		ticksInGame = 10, // 90 second games
+		progress; // arrows canceller
+		
+	// add a tick count property to the emitter
+	emitter.gameTick = 0;
+
+	function stopTicking () {
+		clearInterval(gameClockCancellers[id]);
+	}
+	
+	// start the game clock ticking (or resume it)
+	function startTicking() {
+		var canceller = setInterval(function () {
+			emitter.gameTick += 1;
+			console.log('tick ', emitter.gameTick );
+			emitter.emit('tick', { tick: emitter.gameTick });
+		}, 1000);
+		gameClockCancellers[id] = canceller;
+	}
+	
+	function createAndRunArrows() {
+		// an update to the client countdown display every second of elapsed game time
+		// ListenA is not tuple-aware (it is based on original arrowlets 'EventA')
+		// so we pass in a single argument through ARR.ConstA
+		// our anonymous function returns ARR.Repeat() so that we can use
+		// .repeat() to continue indefinitely
+		var countDown =
+			ARR.ConstA(emitter)
+				.then(ARR.ListenA('tick'))
+				.then(function (e) {
+					game.server_setCountdown({ ticks: ticksInGame - e.tick });
+					return ARR.Repeat();
+				})
+				.repeat();
+	
+		// listen with value is tuple-aware, so start off with a tuple
+		// When we get to the number of ticks in the game
+		// we tell the user, cancel the arrows and clear the tick interval
+		var timeoutGame =
+			ARR.ConstA(new ARR.Pair(emitter, null))
+				.then(ARR.ListenWithValueA('tick', 'tick', ticksInGame))
+				// we really don't care what gets passed to this function
+				.then(function () {
+					// tell the user it's over
+					game.server_sendMessage('Time has run out!');
+					// play a 'losing' sound here!
+					game.server_playSound({ name: 'win.m4a', gain: 0.5 });
+					// cancel all arrows
+					progress.cancel();
+					// cancel the tick interval
+					stopTicking();
+				});
+				
+		// fanout (run in parallel) the arrows we created	
+		progress = countDown
+			.fanout(timeoutGame)
+			.run();
+	}
 	
 	// create io
 	game.gameIo = createGameIo(io, id, game);
@@ -119,7 +186,10 @@ function createGame(id) {
 	// handle incoming messages from client	
 	game.startGame = function(data) {
 		// start the game!
+		emitter.gameTick = 0;		
 		console.log('user requested start game');
+		createAndRunArrows();
+		tickCanceller = startTicking();
 		game.server_sendMessage('The game has started!');
 		game.server_playSound({ name: 'win.m4a', gain: 0.5 });
 	};
@@ -128,7 +198,7 @@ function createGame(id) {
 		// can the user move here?
 		console.log('user request move-to ', data);
 		// did they land on a prize? increase points, remove prize, update points
-		
+		emitter.emit('request-move-to', data);
 	};
 	
 	game.server_movePlayer = function (to) {

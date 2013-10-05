@@ -132,6 +132,10 @@ $(function () {
 		$('#message').text(data);
 	});	
 	
+	socket.on('set-countdown', function (data) {
+		$('#gameCountdown').text(data.ticks);
+	});
+	
 	function setTiles(tiles) {
 		var i,
 			tilesLength = tiles.length;
