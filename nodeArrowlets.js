@@ -1210,20 +1210,23 @@ function Listen2(eventname) {
         return new Listen2(eventname);
     this.eventname = eventname;
 }
-Listen2.prototype = new AsyncA(function Listen2$prototype$t(tuple, a) {
+Listen2.prototype = new AsyncA(function Listen2$prototype$t(pair, a) {
     var eventname = this.eventname,
-    	emitter = tuple.components['0'];
+    	emitter = pair.fst();
 
     var cancel = function Listen2$prototype$t$$cancel() {
         emitter.removeListener(eventname, listener);
     }
     var listener = function Listen2$prototype$t$$listener(event) {
+        console.log('heard ', eventname);
+
     	emitter.eventData = event;
         cancel();
         a.advance(cancel);
-        a.cont(tuple);
+        a.cont(pair);
     }
     a.addCanceller(cancel);
+    console.log('add listener for Listen2 ', eventname);
     emitter.addListener(eventname, listener);
 });
 Listen2.prototype.toAString = function Listen2$prototype$toAString() {
@@ -1242,14 +1245,14 @@ function ListenWithValueA(eventname, propertyname, value) {
     this.propertyname = propertyname;
     this.value = value;
 }
-ListenWithValueA.prototype = new AsyncA(function ListenWithValueA$prototype$t(tuple, a) {
+ListenWithValueA.prototype = new AsyncA(function ListenWithValueA$prototype$t(pair, a) {
 	// the value of 'this' depends on how a function is called, 
 	// so store the value of this in the property 'that' 
 	// in this closure so that we can get to it from cancel and listener
     var eventname = this.eventname,
     	propertyname = this.propertyname,
     	value = this.value,
-    	emitter = tuple.components['0'];
+    	emitter = pair.fst();
 	
 	// cancel just removes the listener from the emitter
     var cancel = function ListenWithValueA$prototype$t$$cancel() {
@@ -1266,7 +1269,7 @@ ListenWithValueA.prototype = new AsyncA(function ListenWithValueA$prototype$t(tu
     		emitter.eventData = event;
 			cancel();
 			a.advance(cancel);
-			a.cont(tuple);
+			a.cont(pair);
         }
     }
     

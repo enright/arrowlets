@@ -177,11 +177,40 @@ function createGame(id) {
 					return ARR.Repeat();
 				})
 				.repeat();
-					
+				
+		var atStartOfGame = ARR.ConstA(new ARR.Pair(emitter, 0))
+			.then(ARR.Listen2('start-game'))
+			.then((function (points) {
+				var newPoints = Math.floor(Math.random()*6) + 1;
+				console.log('start player move points ', newPoints);
+				game.pieces[0].movementPoints = newPoints;
+				return newPoints;
+			}).second());
+		
+		var everyThreeTicks = MYARR.DelayGameTicksA(3)
+				.then((function (points) {
+					var newPoints = Math.floor(Math.random()*6) + 1;
+					game.pieces[0].movementPoints += newPoints;
+					if (game.pieces[0].movementPoints > 12) {
+						game.pieces[0].movementPoints = 12;
+					}
+					console.log('player move points ', game.pieces[0].movementPoints);
+					return newPoints;
+				}).second())
+				.then(repeatTuple)
+				.repeat();
+		
+		// lets have the player accumulate movement points every three seconds
+		// but never more than 12
+		var playerAccumulateMovementPoints = 
+			atStartOfGame
+			.then(everyThreeTicks);
+			
 		// fanout (run in parallel) the arrows we created	
 		progress = countDown
 			.fanout(timeoutGame)
 			.fanout(playerMovement)
+			.fanout(playerAccumulateMovementPoints)
 			.run();
 	}
 	
