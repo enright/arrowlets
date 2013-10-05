@@ -102,11 +102,18 @@ function createGame(id) {
 	var game = {},
 		emitter = new events.EventEmitter(),
 		tickCanceller,
-		ticksInGame = 10, // 90 second games
+		ticksInGame = 120, // 90 second games
 		progress; // arrows canceller
 		
 	// add a tick count property to the emitter
 	emitter.gameTick = 0;
+
+	game.pieces = [{ rank: 0, file: 0, src: "pieceImages/sumo-wrestler.png" }];
+	game.prizes =  [{ rank: 2, file:3, src: "prizeImages/key.png" },
+						{ rank: 6, file: 5, src: "prizeImages/Chest-Closed.png" }];
+	game.tiles =  [{ rank: 3, file: 10, src: "tileImages/water.png" }, 
+					{ rank: 4, file: 10, src: "tileImages/water.png" },
+					{ rank: 3, file: 11, src: "tileImages/water.png" }];
 
 	function stopTicking () {
 		clearInterval(gameClockCancellers[id]);
@@ -116,7 +123,6 @@ function createGame(id) {
 	function startTicking() {
 		var canceller = setInterval(function () {
 			emitter.gameTick += 1;
-			console.log('tick ', emitter.gameTick );
 			emitter.emit('tick', { tick: emitter.gameTick });
 		}, 1000);
 		gameClockCancellers[id] = canceller;
@@ -155,9 +161,24 @@ function createGame(id) {
 					stopTicking();
 				});
 				
+		// for starters, let the user move wherever they want, whenever
+		var playerMovement = 
+			ARR.ConstA(emitter)
+				.then(ARR.ListenA('request-move-to'))
+				.then(function (e) {
+					var rank = e.rank,
+						file = e.file;
+					game.pieces[0].rank = rank;
+					game.pieces[0].file = file;
+					game.server_movePlayer(game.pieces[0]);
+					return ARR.Repeat();
+				})
+				.repeat();
+				
 		// fanout (run in parallel) the arrows we created	
 		progress = countDown
 			.fanout(timeoutGame)
+			.fanout(playerMovement)
 			.run();
 	}
 	
@@ -166,19 +187,12 @@ function createGame(id) {
 	
 	// get data to the client to configure the game
 	game.connected = function(socket) {
-		var prizes = [{ rank: 2, file:3, src: "prizeImages/key.png" },
-						{ rank: 6, file: 5, src: "prizeImages/Chest-Closed.png" }],
-			pieces = [{ rank: 0, file: 0, src: "pieceImages/sumo-wrestler.png" }],
-			tiles = [{ rank: 3, file: 10, src: "tileImages/water.png" }, 
-				{ rank: 4, file: 10, src: "tileImages/water.png" },
-				{ rank: 3, file: 11, src: "tileImages/water.png" }];
-
 		socket.emit('board', { ranks: 20, 
 			files: 15, 
 			defaultImageURL: 'tileImages/grassField.png', 
-			prizes: prizes, 
-			pieces: pieces,
-			tiles: tiles
+			prizes: game.prizes, 
+			pieces: game.pieces,
+			tiles: game.tiles
 		});
 
 	};
@@ -202,11 +216,7 @@ function createGame(id) {
 	};
 	
 	game.server_movePlayer = function (to) {
-		game.gameIo.namespace.emit('set-pieces', [{ name: 'player', 
-			src: 'pieceImages/sumo-wrestler.png', 
-			rank: to. r, 
-			file: to.f 
-		}]);
+		game.gameIo.namespace.emit('set-pieces', [to]);
 	};
 	
 	game.server_moveMonster = function (to) {

@@ -165,6 +165,9 @@ $(function () {
 			li,
 			pieceImage,
 			regClasses;
+
+		// pieces are being replaced, so remove them
+		$('#ourCoolMap').find('img[data-layer=\"piece\"]').remove();
 			
 		for (i = 0; i < piecesLength; i += 1) {
 			// get the list item for this rank and file
