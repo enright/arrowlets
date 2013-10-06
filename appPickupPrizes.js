@@ -109,9 +109,11 @@ function createGame(id) {
 	// add a tick count property to the emitter
 	emitter.gameTick = 0;
 
-	game.pieces = [{ rank: 0, file: 0, src: "pieceImages/sumo-wrestler.png" }];
-	game.prizes =  [{ rank: 2, file:3, src: "prizeImages/key.png" },
-						{ rank: 6, file: 5, src: "prizeImages/Chest-Closed.png" }];
+	game.pieces = [{ rank: 0, file: 0, src: "pieceImages/sumo-wrestler.png", prizePoints: 0 }];
+	game.prizes =  [{ rank: 2, file:3, src: "prizeImages/Sushi.png" },
+						{ rank: 6, file: 5, src: "prizeImages/miso-soup.png" },
+						{ rank: 10, file: 9, src: "prizeImages/bonsai.png" },
+						{ rank: 12, file: 14, src: "prizeImages/Sushi.png" }];
 	game.tiles =  [{ rank: 3, file: 10, src: "tileImages/water.png" }, 
 					{ rank: 4, file: 10, src: "tileImages/water.png" },
 					{ rank: 3, file: 11, src: "tileImages/water.png" }];
@@ -153,7 +155,7 @@ function createGame(id) {
 				.then(ARR.ListenWithValueA('tick', 'tick', ticksInGame))
 				// we really don't care what gets passed to this function
 				.then(function () {
-					console.log('it game over!');
+					console.log('it is game over!');
 					// tell the user it's over
 					game.server_sendMessage('Time has run out!');
 					// play a 'losing' sound here!
@@ -169,48 +171,74 @@ function createGame(id) {
 			ARR.ConstA(emitter)
 				.then(ARR.ListenA('request-move-to'))
 				.then(function (e) {
-					var rank = e.rank,
-						file = e.file;
+					var rank = e.rank*1, // coerce string to num
+						file = e.file*1;
 					game.pieces[0].rank = rank;
 					game.pieces[0].file = file;
+					// is there a prize here?
+					prize = onAPrize(rank, file);
+					if (prize) {
+						console.log('landed on a prize ', prize);
+						emitter.emit('take-prize', { rank: rank, file: file, prize: prize });
+					}
+					
 					game.server_movePlayer(game.pieces[0]);
 					return ARR.Repeat();
 				})
 				.repeat();
 				
-		var atStartOfGame = ARR.ConstA(new ARR.Pair(emitter, 0))
-			.then(ARR.Listen2('start-game'))
-			.then((function (points) {
-				var newPoints = Math.floor(Math.random()*6) + 1;
-				console.log('start player move points ', newPoints);
-				game.pieces[0].movementPoints = newPoints;
-				return newPoints;
-			}).second());
+		function onAPrize(rank, file) {
+			var i, length = game.prizes.length;
+			for (i = 0; i < length; i += 1) {
+				if (game.prizes[i].rank === rank && game.prizes[i].file === file) {
+					return game.prizes[i].src;
+				}
+			}
+			return undefined;
+		}
 		
-		var everyThreeTicks = MYARR.DelayGameTicksA(3)
-				.then((function (points) {
-					var newPoints = Math.floor(Math.random()*6) + 1;
-					game.pieces[0].movementPoints += newPoints;
-					if (game.pieces[0].movementPoints > 12) {
-						game.pieces[0].movementPoints = 12;
-					}
-					console.log('player move points ', game.pieces[0].movementPoints);
-					return newPoints;
-				}).second())
-				.then(repeatTuple)
-				.repeat();
-		
-		// lets have the player accumulate movement points every three seconds
-		// but never more than 12
-		var playerAccumulateMovementPoints = 
-			atStartOfGame
-			.then(everyThreeTicks);
+		var takePrizes =
+			(ARR.ConstA(new ARR.Pair(emitter, null))
+				.then(
+					ARR.ListenWithValueA('take-prize', 'prize', 'prizeImages/Sushi.png')
+					.then((function (p) { 
+							game.pieces[0].prizePoints += 100;
+							game.server_setPoints(game.pieces[0].prizePoints);
+							game.server_playSound({ name: 'boo', gain:0.3 });
+							return p;
+						}).Arr())
+				)
+// 				.or(
+// 					ARR.ListenWithValueA('take-prize', 'prize', 'prizeImages/miso-soup.png')
+// 					.then((function (p) { 
+// 							game.pieces[0].prizePoints += 50;
+// 							game.server_setPoints(game.pieces[0].prizePoints);
+// 							game.server_playSound({ name: 'boo', gain:0.3 });
+// 							return p;
+// 						}).Arr())
+// 				)
+			)				
+			.then(repeatTuple)
+			.repeat();
 			
+			// 	.or(ARR.ListenWithValueA('take-prize', 'prize', 'miso-soup.png')
+// 					.then((function (p) { 
+// 							game.pieces[0].prizePoints += 50;
+// 							game.server_setPoints(game.pieces[0].prizePoints);
+// 							return p;
+// 						}).second()))
+// 				.or(ARR.ListenWithValueA('take-prize', 'prize', 'bonsai.png')
+// 					.then((function (p) { 
+// 							game.pieces[0].prizePoints += 75;
+// 							game.server_setPoints(game.pieces[0].prizePoints);
+// 							return p
+// 						}).second()));
+				
 		// fanout (run in parallel) the arrows we created	
 		progress = countDown
 			.fanout(timeoutGame)
 			.fanout(playerMovement)
-			.fanout(playerAccumulateMovementPoints)
+			.fanout(takePrizes)
 			.run();
 	}
 	

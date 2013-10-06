@@ -72,6 +72,7 @@ app.get('/test', function(req, res) {
 	res.send('ouch');
 });
 
+
 function createGameIo(io, id, game) {
 	var gameIo = {};
 	
@@ -105,10 +106,133 @@ function createGame(id) {
 		tickCanceller,
 		ticksInGame = 90, // 90 second games
 		progress; // arrows canceller
+
+	// a function that returns the list of adjacent tiles
+	// for a rank and file if the tiles are hexes
+	function adjacentHexTiles(r, f) {
+		var ranks = game.ranks,
+			files = game.files,
+			rIsEven = r % 2 !== 1,
+			squaresToCheck = [];
+
+		// directly above is r-2, directly below is r+2
+		if (r - 2 >= 0) {
+			squaresToCheck.push([r - 2, f]);
+		}
+		if (r + 2 < ranks) {
+			squaresToCheck.push([r + 2, f]);
+		}
+		if (rIsEven) {
+			// if r is even, then up left is r-1, down left is r+1, up right is r-1, f+1, down right is r+1, f+1
+			if (r - 1 >= 0) {
+				// up left
+				squaresToCheck.push([r - 1, f]);
+				if (f + 1 < files) {
+					// up right
+					squaresToCheck.push([r - 1, f + 1]);
+				}
+			}
+			if (r + 1 < ranks) {
+				// down left
+				squaresToCheck.push([r + 1, f]);
+				// down right
+				if (f + 1 < files) {
+					squaresToCheck.push([r + 1, f + 1]);
+				}
+			}
+		} else {
+			// if r is odd, up left is f-1, r-1 down left is f-1, r + 1, up right is r -1, down right is r+1
+			if (r - 1 >= 0) {
+				// up right
+				squaresToCheck.push([r - 1, f]);
+				if (f - 1 >= 0) {
+					// up left
+					squaresToCheck.push([r - 1, f - 1]);
+				}
+			}
+			if (r + 1 < ranks) {
+				// down right
+				squaresToCheck.push([r + 1, f]);
+				if (f - 1 >= 0) {
+					// down left
+					squaresToCheck.push([r + 1, f - 1]);
+				}
+			}
+
+		}
+
+		return squaresToCheck;
+	}
+	function possibleMovesFromSquares(r, f, rollvalue) {
+		var possibleMoves = {};
+
+		// given potential move-to squares, can we move to them?
+		// return an array of the ones we can move to, with the resulting fuel
+		function getCanEnterSquares(squaresToVisit, rollValue) {
+			var canEnterSquares = [],
+				i,
+				j,
+				length,
+				r,
+				f,
+				testSquare,
+				friction,
+				possibleMove;
+
+			for (i = 0, length = squaresToVisit.length; i < length; i += 1) {
+				r = squaresToVisit[i][0];
+				f = squaresToVisit[i][1];
+				//testSquare = board.getSquare(r, f);
+				// friction is 1 unless this is a water square, in which case 5
+				friction = 1;
+				for (j = 0; j < game.tiles.length; j += 1) {
+					if (r === game.tiles[i].rank && f === game.tiles[i].file) {
+						friction = 5;
+						break;
+					}
+				}
+	// 			friction = testSquare.friction;
+	// 			// can't enter squares with undefined friction
+	// 			if (friction === undefined) {
+	// 				friction = 1000000000;
+	// 			}
+				// if we could enter this square
+				if (rollValue >= friction) {
+					// if we've already been to this square with an equal or higher fuel
+					// we don't say we can enter
+					possibleMove =	possibleMoves[r + ',' + f];
+					if (possibleMove === undefined || possibleMove.remainingFuel < rollValue - friction) {
+						possibleMoves[r + ',' + f] = { r: r, f: f, remainingFuel: rollValue - friction };
+						// explore with this new, higher roll value
+						canEnterSquares.push([ r, f, rollValue - friction ]);
+					}
+				}
+			}
+			return canEnterSquares;
+		}
+
+		function getPossibleMovesInternal(originatingSquares) {
+			var i,
+				length,
+				squaresToVisit,
+				canEnterSquares;
+
+			for (i = 0, length = originatingSquares.length; i < length; i += 1) {
+				squaresToVisit = adjacentHexTiles(originatingSquares[i][0], originatingSquares[i][1]);
+				canEnterSquares = getCanEnterSquares(squaresToVisit, originatingSquares[i][2]);
+				getPossibleMovesInternal(canEnterSquares);
+			}
+		}
+
+		getPossibleMovesInternal([[r, f, rollvalue]]);
+		return possibleMoves;
+	}
 		
 	// add a tick count property to the emitter
 	emitter.gameTick = 0;
 
+	game.ranks = 20;
+	game.files = 15;
 	game.pieces = [{ rank: 0, file: 0, src: "pieceImages/sumo-wrestler.png" }];
 	game.prizes =  [{ rank: 2, file:3, src: "prizeImages/key.png" },
 						{ rank: 6, file: 5, src: "prizeImages/Chest-Closed.png" }];
@@ -153,7 +277,7 @@ function createGame(id) {
 				.then(ARR.ListenWithValueA('tick', 'tick', ticksInGame))
 				// we really don't care what gets passed to this function
 				.then(function () {
-					console.log('it is game over!');
+					console.log('it game over!');
 					// tell the user it's over
 					game.server_sendMessage('Time has run out!');
 					// play a 'losing' sound here!
@@ -164,6 +288,11 @@ function createGame(id) {
 					stopTicking();
 				});
 				
+		function canPlayerMoveTo(rank, file, points) {
+			var possibleMoves = possibleMovesFromSquares(rank, file, points);
+			return true;
+		}
+		
 		// for starters, let the user move wherever they want, whenever
 		var playerMovement = 
 			ARR.ConstA(emitter)
@@ -171,17 +300,52 @@ function createGame(id) {
 				.then(function (e) {
 					var rank = e.rank,
 						file = e.file;
-					game.pieces[0].rank = rank;
-					game.pieces[0].file = file;
-					game.server_movePlayer(game.pieces[0]);
+						poss
+					if (canPlayerMoveTo(rank, file, game.pieces[0].movementPoints)) {
+						game.pieces[0].rank = rank;
+						game.pieces[0].file = file;
+						game.server_movePlayer(game.pieces[0]);
+						game.server_playSound({ name: 'win.m4a', gain: 0.5 });
+					} else {
+						game.server_playSound({ name: 'win.m4a', gain: 0.5 });
+					}
 					return ARR.Repeat();
 				})
 				.repeat();
-					
+				
+		var atStartOfGame = ARR.ConstA(new ARR.Pair(emitter, 0))
+			.then(ARR.Listen2('start-game'))
+			.then((function (points) {
+				var newPoints = Math.floor(Math.random()*6) + 1;
+				console.log('start player move points ', newPoints);
+				game.pieces[0].movementPoints = newPoints;
+				return newPoints;
+			}).second());
+		
+		var everyThreeTicks = MYARR.DelayGameTicksA(3)
+				.then((function (points) {
+					var newPoints = Math.floor(Math.random()*6) + 1;
+					game.pieces[0].movementPoints += newPoints;
+					if (game.pieces[0].movementPoints > 12) {
+						game.pieces[0].movementPoints = 12;
+					}
+					console.log('player move points ', game.pieces[0].movementPoints);
+					return newPoints;
+				}).second())
+				.then(repeatTuple)
+				.repeat();
+		
+		// lets have the player accumulate movement points every three seconds
+		// but never more than 12
+		var playerAccumulateMovementPoints = 
+			atStartOfGame
+			.then(everyThreeTicks);
+			
 		// fanout (run in parallel) the arrows we created	
 		progress = countDown
 			.fanout(timeoutGame)
 			.fanout(playerMovement)
+			.fanout(playerAccumulateMovementPoints)
 			.run();
 	}
 	
@@ -190,8 +354,8 @@ function createGame(id) {
 	
 	// get data to the client to configure the game
 	game.connected = function(socket) {
-		socket.emit('board', { ranks: 20, 
-			files: 15, 
+		socket.emit('board', { ranks: game.ranks, 
+			files: game.files, 
 			defaultImageURL: 'tileImages/grassField.png', 
 			prizes: game.prizes, 
 			pieces: game.pieces,
