@@ -1264,6 +1264,7 @@ ListenWithValueA.prototype = new AsyncA(function ListenWithValueA$prototype$t(pa
     var listener = function ListenWithValueA$prototype$t$$listener(event) {
     	// check the property on the event and see if it is the value we're looking for
     	if (event[propertyname] === value) {
+			console.log('ListenWithValueA ', propertyname, value);
     		// if we get the right value, cancel this arrow
     		// advance and pass the event to the next arrow
     		emitter.eventData = event;

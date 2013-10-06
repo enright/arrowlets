@@ -309,13 +309,78 @@ function createGame(id) {
 					// or the user got the chest and process that
 					.or(ARR.ListenWithValueA('take-prize', 'prize', 'prizeImages/Chest-Closed.png')
 						.then(playerTookChest)));
-				
+
+		function getTile(rank, file) {
+			// if the tile is in our list, return it
+			var i, length = game.tiles.length;
+			for (i = 0; i < length; i += 1) {
+				if (game.tiles[i].rank === rank && game.tiles[i].file === file) {
+					return game.tiles[i];
+				}
+			}
+			// otherwise push and return a default tile
+			game.tiles.push({ rank: rank, file: file, src: 'tileImages/grassField.png' });
+			return game.tiles[game.tiles.length - 1];
+		}
+
+		// apply changes and return the restore information
+		function applyChanges(game, changes) {
+			var i,
+				length = changes.length,
+				tile,
+				restore = [];
+			console.log('changes ', changes);
+			for (i = 0; i < length; i += 1 ) {
+				tile = getTile(changes[i].rank, changes[i].file);
+				restore[i] = { rank: changes[i].rank, file: changes[i].file, src: tile.src };		
+				tile.src = changes[i].src;
+			}
+			console.log('restore ', restore);
+			game.server_setTiles(game.tiles);
+			return restore;
+		}
+
+		// apply changes to the board and return the original tile values
+		// the board is 'in' the closure of the returned function
+		var boardTileChange = (function (game) {
+			return function (changes) {
+				return applyChanges(game, changes);
+			};
+		}(game));
+		
+		// increase the size of the puddle
+		var boardChanges = [
+					{ rank: 2, file: 10, src: "tileImages/water.png" }, 
+					{ rank: 3, file: 10, src: "tileImages/water.png" },
+					{ rank: 2, file: 11, src: "tileImages/water.png" },	
+					{ rank: 4, file: 10, src: "tileImages/water.png" }, 
+					{ rank: 5, file: 10, src: "tileImages/water.png" },
+					{ rank: 4, file: 11, src: "tileImages/water.png" }
+		];
+		
+		// create a board tile changing arrow
+		var boardTileChanges =
+			ARR.ConstA(new ARR.Pair(emitter, boardChanges))
+				// wait
+				.then(MYARR.DelayGameTicksA(4))
+				// then change the tiles
+				.then(boardTileChange.second())
+				// wait
+				.then(MYARR.DelayGameTicksA(6))
+				// and change them back
+				.then(boardTileChange.second())
+				// repeat this forever
+				.then(repeatTuple)
+				.repeat();
+			
+			
 		// fanout (run in parallel) the arrows we created	
 		progress = countDown
 			.fanout(timeoutGame)
 			.fanout(playerMovement)
 			.fanout(takePrizes)
 			.fanout(chestAndKey)
+			.fanout(boardTileChanges)
 			.run();
 	}
 	
@@ -384,6 +449,10 @@ function createGame(id) {
 	
 	game.server_removePrize = function (prize) {
 		game.gameIo.namespace.emit('remove-prizes', [prize]);
+	};
+	
+	game.server_setTiles = function (tiles) {
+		game.gameIo.namespace.emit('set-tiles', tiles);
 	};
 	
 	return game;

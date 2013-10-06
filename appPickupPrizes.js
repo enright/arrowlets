@@ -231,29 +231,36 @@ function createGame(id) {
 				.then(
 					ARR.ListenWithValueA('take-prize', 'prize', 'prizeImages/miso-soup.png')
 					.then((function (p) { 
+							var eventData = p.fst().eventData;
 							game.pieces[0].prizePoints += 50;
 							game.server_setPoints(game.pieces[0].prizePoints);
 							game.server_playSound({ name: 'boo', gain:0.3 });
+							removeAPrize(eventData.rank, eventData.file);
+							game.server_removePrize(eventData);
 							return p;
 						}).Arr())
 				)			
 			.then(repeatTuple)
 			.repeat();
 		
-		takePrizes = sushiPrize.fanout(misoPrize);
-			
-			// 	.or(ARR.ListenWithValueA('take-prize', 'prize', 'miso-soup.png')
-// 					.then((function (p) { 
-// 							game.pieces[0].prizePoints += 50;
-// 							game.server_setPoints(game.pieces[0].prizePoints);
-// 							return p;
-// 						}).second()))
-// 				.or(ARR.ListenWithValueA('take-prize', 'prize', 'bonsai.png')
-// 					.then((function (p) { 
-// 							game.pieces[0].prizePoints += 75;
-// 							game.server_setPoints(game.pieces[0].prizePoints);
-// 							return p
-// 						}).second()));
+		var bonsaiPrize =
+			ARR.ConstA(new ARR.Pair(emitter, null))
+				.then(
+					ARR.ListenWithValueA('take-prize', 'prize', 'prizeImages/bonsai.png')
+					.then((function (p) { 
+							var eventData = p.fst().eventData;
+							game.pieces[0].prizePoints += 75;
+							game.server_setPoints(game.pieces[0].prizePoints);
+							game.server_playSound({ name: 'boo', gain:0.3 });
+							removeAPrize(eventData.rank, eventData.file);
+							game.server_removePrize(eventData);
+							return p;
+						}).Arr())
+				)			
+			.then(repeatTuple)
+			.repeat();
+		
+		takePrizes = sushiPrize.fanout(misoPrize).fanout(bonsaiPrize);
 				
 		// fanout (run in parallel) the arrows we created	
 		progress = countDown

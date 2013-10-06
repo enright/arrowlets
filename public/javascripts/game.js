@@ -232,8 +232,14 @@ $(function () {
 			prizesLength = prizes.length;
 			
 		for (i = 0; i < prizesLength; i += 1) {
-			$('li.b-rank-' + prizes[i].rank + '.b-file-' + prizes[i].file)
-				.find('img[src=\"'+prizes[i].src + '\"]').remove();
+			// bug here - why can't i user src url when specifying attribute value
+			// maybe the '/' in the url
+			// var findPrize = $('li.b-rank-' + prizes[i].rank + '.b-file-' + prizes[i].file)
+			// 	.find('img[src=\"'+prizes[i].src + '\"]');
+			// instead, let's just remove prize using data-layer attribute
+			var findPrize = $('li.b-rank-' + prizes[i].rank + '.b-file-' + prizes[i].file)
+				.find('img[data-layer=\"prize\"]');
+			findPrize.remove();
 		}
 	}
 	
