@@ -173,15 +173,17 @@ function createGame(id) {
 				.then(function (e) {
 					var rank = e.rank*1, // coerce string to num
 						file = e.file*1;
-					game.pieces[0].rank = rank;
-					game.pieces[0].file = file;
+					
 					// is there a prize here?
 					prize = onAPrize(rank, file);
 					if (prize) {
-						console.log('landed on a prize ', prize);
+						// take the prize
 						emitter.emit('take-prize', { rank: rank, file: file, prize: prize });
 					}
 					
+					// move the player
+					game.pieces[0].rank = rank;
+					game.pieces[0].file = file;
 					game.server_movePlayer(game.pieces[0]);
 					return ARR.Repeat();
 				})
@@ -197,29 +199,48 @@ function createGame(id) {
 			return undefined;
 		}
 		
-		var takePrizes =
-			(ARR.ConstA(new ARR.Pair(emitter, null))
+		function removeAPrize(rank, file) {
+			var i, length = game.prizes.length;
+			for (i = 0; i < length; i += 1) {
+				if (game.prizes[i].rank === rank && game.prizes[i].file === file) {
+					game.prizes.slice(i, 1);
+					return;
+				}
+			}			
+		}
+		
+		var sushiPrize =
+			ARR.ConstA(new ARR.Pair(emitter, null))
 				.then(
 					ARR.ListenWithValueA('take-prize', 'prize', 'prizeImages/Sushi.png')
 					.then((function (p) { 
+							var eventData = p.fst().eventData;
 							game.pieces[0].prizePoints += 100;
+							game.server_setPoints(game.pieces[0].prizePoints);
+							game.server_playSound({ name: 'boo', gain:0.3 });
+							removeAPrize(eventData.rank, eventData.file);
+							game.server_removePrize(eventData);
+							return p;
+						}).Arr())
+				)			
+			.then(repeatTuple)
+			.repeat();
+			
+		var misoPrize =
+			ARR.ConstA(new ARR.Pair(emitter, null))
+				.then(
+					ARR.ListenWithValueA('take-prize', 'prize', 'prizeImages/miso-soup.png')
+					.then((function (p) { 
+							game.pieces[0].prizePoints += 50;
 							game.server_setPoints(game.pieces[0].prizePoints);
 							game.server_playSound({ name: 'boo', gain:0.3 });
 							return p;
 						}).Arr())
-				)
-// 				.or(
-// 					ARR.ListenWithValueA('take-prize', 'prize', 'prizeImages/miso-soup.png')
-// 					.then((function (p) { 
-// 							game.pieces[0].prizePoints += 50;
-// 							game.server_setPoints(game.pieces[0].prizePoints);
-// 							game.server_playSound({ name: 'boo', gain:0.3 });
-// 							return p;
-// 						}).Arr())
-// 				)
-			)				
+				)			
 			.then(repeatTuple)
 			.repeat();
+		
+		takePrizes = sushiPrize.fanout(misoPrize);
 			
 			// 	.or(ARR.ListenWithValueA('take-prize', 'prize', 'miso-soup.png')
 // 					.then((function (p) { 
@@ -304,6 +325,11 @@ function createGame(id) {
 	game.server_playSound = function (sound) {
 		game.gameIo.namespace.emit('one-shot-sound', sound);
 	};
+	
+	game.server_removePrize = function (prize) {
+		game.gameIo.namespace.emit('remove-prizes', [prize]);
+	};
+	
 	return game;
 }
 
